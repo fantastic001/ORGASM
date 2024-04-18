@@ -59,6 +59,11 @@ def command_executor_main(cls):
                 if not Path(A[arg]).exists():
                     print("Path %s does not exist" % A[arg])
                     sys.exit(1)
+            if hasattr(executor, "VALID_VALUES") and getattr(executor, "VALID_VALUES").get(command, {}).get(arg, None) is not None:
+                if A[arg] not in getattr(executor, "VALID_VALUES")[command][arg]:
+                    print("Invalid value %s for argument %s" % (A[arg], arg))
+                    print("Valid values are: %s" % ", ".join([ str(x) for x in getattr(executor, "VALID_VALUES")[command][arg]]))
+                    sys.exit(1)
         result = m(**A)
         if isinstance(result, dict):
             # pretty print dict 

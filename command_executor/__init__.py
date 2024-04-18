@@ -1,4 +1,5 @@
 import argparse
+from pathlib import Path
 import sys
 from typing import Dict 
 
@@ -46,8 +47,18 @@ def command_executor_main(cls):
         for arg in get_arguments(m):
             if arg != "self":
                 A[arg] = getattr(args, arg)
+            # if arg is type PathLike then check if path exists
+            if get_arg_type(m, arg) == Path:
+                if not Path(A[arg]).exists():
+                    print("Path %s does not exist" % A[arg])
+                    sys.exit(1)
         for arg, _ in get_optional_arguments(m):
             A[arg] = getattr(args, arg)
+            # if arg is type PathLike then check if path exists
+            if get_arg_type(m, arg) == Path:
+                if not Path(A[arg]).exists():
+                    print("Path %s does not exist" % A[arg])
+                    sys.exit(1)
         result = m(**A)
         if isinstance(result, dict):
             # pretty print dict 

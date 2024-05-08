@@ -6,78 +6,129 @@ import inspect
 from command_executor.command_class_inspector import * 
 
 
+def get_command_specs(classes):
+    spec = []
+    available_commands = []
+    for cls in classes:
+        available_commands += get_available_commands(cls)
+    for command in available_commands:
+        for cls in classes:
+            if hasattr(cls, command):
+                args = [] 
+                for arg in get_arguments(getattr(cls, command)):
+                    args.append({
+                        "name": arg,
+                        "required": True,
+                        "type": get_arg_type(getattr(cls, command), arg),
+                        "help": get_arg_description(getattr(cls, command), arg),
+                    })
+                    if hasattr(cls, "VALID_VALUES") and getattr(cls, "VALID_VALUES").get(command, {}).get(arg, None) is not None:
+                        args[-1]["valid_values"] = getattr(cls, "VALID_VALUES")[command][arg]
+                    else:
+                        args[-1]["valid_values"] = None
+                for arg, value in get_optional_arguments(getattr(cls, command)):
+                    args.append({
+                        "name": arg,
+                        "required": False,
+                        "type": get_arg_type(getattr(cls, command), arg),
+                        "help": get_arg_description(getattr(cls, command), arg),
+                        "default": value
+                    })
+                    if hasattr(cls, "VALID_VALUES") and getattr(cls, "VALID_VALUES").get(command, {}).get(arg, None) is not None:
+                        args[-1]["valid_values"] = getattr(cls, "VALID_VALUES")[command][arg]
+                    else:
+                        args[-1]["valid_values"] = None
+                spec.append({
+                    "name": command,
+                    "args": args,
+                    "method_name": command
+                })
+    return spec
+
+def execute_command(classes, command: str, params):
+    spec = get_command_specs(classes)
+    command = [x for x in spec if x["name"] == command]
+    if len(command) == 0:
+        raise ValueError("Command %s not found" % command)
+    command = command[0]
+    for cls in classes:
+        executor = cls()
+        if hasattr(executor, command["method_name"]):
+            m = getattr(executor, command["method_name"])
+            A = {}
+            for arg in command["args"]:
+                if arg != "self":
+                    if arg["name"] in params:
+                        A[arg["name"]] = params[arg["name"]]
+                    else:
+                        if "default" in arg:
+                            A[arg["name"]] = arg["default"]
+                        else:
+                            raise ValueError("Argument %s is required" % arg)
+                # if arg is type PathLike then check if path exists
+                if arg["type"] == Path:
+                    if not Path(A[arg["name"]]).exists():
+                        raise ValueError("Path %s does not exist" % A[arg])
+                if arg["valid_values"] is not None:
+                    if A[arg] not in arg["valid_values"]:
+                        raise ValueError("Invalid value %s for argument %s" % (A[arg], arg))
+            return m(**A)
+    raise ValueError("Command %s not found" % command)
+
 def command_executor_main(classes):
     if not isinstance(classes, list):
         classes = [classes]
     parser = argparse.ArgumentParser()
-    available_commands = []
-    for cls in classes:
-        available_commands += get_available_commands(cls)
     command_parsers = parser.add_subparsers(dest="command")
-
+    spec = get_command_specs(classes)
     commands: Dict[str, argparse.ArgumentParser] = {}
-    for command in available_commands:
-        commands[command] = command_parsers.add_parser(command)
-
-        for cls in classes:
-            if hasattr(cls, command):
-                for arg in get_arguments(getattr(cls, command)):
-                    commands[command].add_argument("--%s" % (arg.replace("_", "-")), 
-                        required=True, 
-                        action="store", 
-                        type=get_arg_type(getattr(cls, command), arg),
-                        help=get_arg_description(getattr(cls, command), arg)
-                    )
-                for arg, value in get_optional_arguments(getattr(cls, command)):
-                    if get_arg_type(getattr(cls, command), arg) == bool:
-                            commands[command].add_argument("--%s" % (arg.replace("_", "-")), 
-                            default=value,
-                            action="store_const",
-                            const=True,
-                            help=get_arg_description(getattr(cls, command), arg)
-                        )
-                    else:
-                        commands[command].add_argument("--%s" % (arg.replace("_", "-")), 
-                            default=value,
-                            action="store",
-                            type=get_arg_type(getattr(cls, command), arg),
-                            help=get_arg_description(getattr(cls, command), arg)
-                        )
+    for command in spec:
+        commands[command["name"]] = command_parsers.add_parser(command["name"])
+        for arg in command["args"]:
+            parser_params = {}
+            if arg["type"] != bool:
+                commands[command["name"]].add_argument("--%s" % arg["name"].replace("_", "-"),
+                    required=arg["required"], 
+                    type=arg["type"],
+                    help=arg["help"],
+                    choices=arg["valid_values"],
+                    default=arg.get("default", None),
+                    action="store" 
+                )
+            else:
+                commands[command["name"]].add_argument("--%s" % arg["name"].replace("_", "-"),
+                    required=arg["required"], 
+                    help=arg["help"],
+                    action="store_true" 
+                )    
     args, _ = parser.parse_known_args()
-    for cls in classes:
-        executor = cls()
-        if hasattr(executor, args.command):
-            m = getattr(executor, args.command)
-            A = {}
-            for arg in get_arguments(m):
-                if arg != "self":
-                    A[arg] = getattr(args, arg)
-                # if arg is type PathLike then check if path exists
-                if get_arg_type(m, arg) == Path:
-                    if not Path(A[arg]).exists():
-                        print("Path %s does not exist" % A[arg])
-                        sys.exit(1)
-            for arg, _ in get_optional_arguments(m):
-                A[arg] = getattr(args, arg)
-                # if arg is type PathLike then check if path exists
-                if get_arg_type(m, arg) == Path:
-                    if not Path(A[arg]).exists():
-                        print("Path %s does not exist" % A[arg])
-                        sys.exit(1)
-                if hasattr(executor, "VALID_VALUES") and getattr(executor, "VALID_VALUES").get(command, {}).get(arg, None) is not None:
-                    if A[arg] not in getattr(executor, "VALID_VALUES")[command][arg]:
-                        print("Invalid value %s for argument %s" % (A[arg], arg))
-                        print("Valid values are: %s" % ", ".join([ str(x) for x in getattr(executor, "VALID_VALUES")[command][arg]]))
-                        sys.exit(1)
-            result = m(**A)
-            if isinstance(result, dict):
-                # pretty print dict 
-                for k,v in result.items():
-                    print("%s: %s" % (k, v))
-            elif result is not None:
-                print(result)
-            return
-    print("This feature is not implemented yet")
+    if args.command is None:
+        parser.print_help()
+        sys.exit(1)
+    params = {}
+    command = [x for x in spec if x["name"] == args.command]
+    if len(command) == 0:
+        raise ValueError("Command %s not found" % args.command)
+    command = command[0]
+    for arg in command["args"]:
+        if arg["name"] in vars(args):
+            params[arg["name"]] = getattr(args, arg["name"])
+    try:
+        result = execute_command(classes, args.command, params)
+        if isinstance(result, str):
+            print(result)
+        elif isinstance(result, dict):
+            for k, v in result.items():
+                print("%s: %s" % (k, v))
+        elif isinstance(result, list):
+            for item in result:
+                print(item)
+        else:
+            print(result)
+    except Exception as e:
+        # print("Error: %s" % e)
+        # sys.exit(1)
+        raise e
 
 def get_classes(module_name):
     module = __import__(module_name)

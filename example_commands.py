@@ -11,8 +11,11 @@ class Commands:
 
     def test(self):
         return "This is test" 
-    def test_path(self, path: Path):
-        return path.name
+    def test_path(self, path: Path, *, full_path: bool=False):
+        if full_path:
+            return path.resolve()
+        else:
+            return path.name
     
     def test_status(self, *, status: int=0):
         return status

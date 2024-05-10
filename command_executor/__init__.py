@@ -70,7 +70,7 @@ def execute_command(classes, command: str, params):
                     if not Path(A[arg["name"]]).exists():
                         raise ValueError("Path %s does not exist" % A[arg])
                 if arg["valid_values"] is not None:
-                    if A[arg] not in arg["valid_values"]:
+                    if A[arg["name"]] not in arg["valid_values"]:
                         raise ValueError("Invalid value %s for argument %s" % (A[arg], arg))
             return m(**A)
     raise ValueError("Command %s not found" % command)

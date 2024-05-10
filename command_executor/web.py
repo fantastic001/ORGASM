@@ -39,6 +39,8 @@ def serve_web(classes):
         if command is None:
             return 'Command not found', 404
         print("Command: ", command['name'])
+        print("Args: ", command['args'])
+        print("Request form: ", request.form)
         for arg in command['args']:
             if arg['name'] in request.form and request.form[arg['name']] not in [None, ""]:
                 params[arg['name']] = arg['type'](request.form[arg['name']])
@@ -52,6 +54,7 @@ def serve_web(classes):
                 local_file_path = f"/tmp/{file.filename}." + random_string(8)
                 file.save(local_file_path)
                 params[arg['name']] = Path(local_file_path)
+        print("Params: ", params)
         result = execute_command(classes, command["name"], params)
         return render_template_string('''
         <html>
@@ -107,13 +110,25 @@ def serve_web(classes):
                     <input type="hidden" name="command" value="{{ command["name"] }}">
                     {% for param in command["args"] %}
                         <label for="{{ param["name"] }}">{{ param["name"] }}</label>
+                        {% if param["valid_values"] %}
+                                      
+                            <select name="{{ param["name"] }}">
+                                {% for value in param["valid_values"] %}
+                                    <option value="{{ value }}">{{ value }}</option>
+                                {% endfor %}
+                            </select>
+                        {% else %}
                         <input type="{{ type_input_mapping[param["type"]] }}" name="{{ param["name"] }}">
+                        {% endif %}
                     {% endfor %}
                     <input type="submit" value="Execute">
                 </form>
             </body>
         </html>
-        ''', command=command, type_input_mapping=type_input_mapping)
+        ''', 
+            command=command, 
+            type_input_mapping=type_input_mapping,
+        )
         return html
 
     app.run(port=8080, debug=True)

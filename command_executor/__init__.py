@@ -4,7 +4,7 @@ import sys
 from typing import Dict 
 import inspect 
 from command_executor.command_class_inspector import * 
-
+from xmlrpc.server import SimpleXMLRPCServer
 
 def get_command_specs(classes):
     spec = []
@@ -69,6 +69,11 @@ def execute_command(classes, command: str, params):
                 if arg["type"] == Path:
                     if not Path(A[arg["name"]]).exists():
                         raise ValueError("Path %s does not exist" % A[arg])
+                if not isinstance(A[arg["name"]], arg["type"]):
+                    try:
+                        A[arg["name"]] = arg["type"](A[arg["name"]])
+                    except:
+                        raise ValueError("Invalid value %s for argument %s" % arg["name"])
                 if arg["valid_values"] is not None:
                     if A[arg["name"]] not in arg["valid_values"]:
                         raise ValueError("Invalid value %s for argument %s" % (A[arg], arg))
@@ -142,3 +147,21 @@ def get_classes(module_name):
             classes[name] = obj
     result = list(classes.values())
     return result
+
+def command_executor_rpc(classes):
+    if not isinstance(classes, list):
+        classes = [classes]
+    server = SimpleXMLRPCServer(("localhost", 8000))
+    class Dispatcher:
+        def __init__(self, classes):
+            self.classes = classes
+        def execute(self, command, params):
+            print("Executing %s with params %s" % (command , params))
+            result = execute_command(self.classes, command, params)
+            print("Result: %s" % result)
+            if isinstance(result, Path):
+                return str(result)
+            else:
+                return result
+    server.register_instance(Dispatcher(classes))
+    server.serve_forever()

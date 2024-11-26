@@ -1,10 +1,14 @@
 import argparse
 from pathlib import Path
 import sys
+import traceback
 from typing import Dict 
 import inspect 
 from command_executor.command_class_inspector import * 
 from xmlrpc.server import SimpleXMLRPCServer
+from xmlrpc.server import SimpleXMLRPCRequestHandler
+from socketserver import ThreadingMixIn
+import xmlrpc.client
 
 def get_command_specs(classes):
     spec = []
@@ -71,9 +75,13 @@ def execute_command(classes, command: str, params):
                         raise ValueError("Path %s does not exist" % A[arg])
                 if not isinstance(A[arg["name"]], arg["type"]):
                     try:
-                        A[arg["name"]] = arg["type"](A[arg["name"]])
+                        if arg["type"] == bytes and isinstance(A[arg["name"]], xmlrpc.client.Binary):
+                            A[arg["name"]] = A[arg["name"]].data
+                        else:
+                            A[arg["name"]] = arg["type"](A[arg["name"]])
                     except:
-                        raise ValueError("Invalid value %s for argument %s" % arg["name"])
+                        traceback.print_exc()
+                        raise ValueError("Invalid value for argument %s" % arg["name"])
                 if arg["valid_values"] is not None:
                     if A[arg["name"]] not in arg["valid_values"]:
                         raise ValueError("Invalid value %s for argument %s" % (A[arg], arg))
@@ -148,16 +156,29 @@ def get_classes(module_name):
     result = list(classes.values())
     return result
 
-def command_executor_rpc(classes):
+def command_executor_rpc(classes, port: int = 8000):
     if not isinstance(classes, list):
         classes = [classes]
-    server = SimpleXMLRPCServer(("localhost", 8000))
+    class RequestHandler(SimpleXMLRPCRequestHandler):
+        rpc_paths = ('/RPC2',)
+
+    # Create a class that combines ThreadingMixIn and SimpleXMLRPCServer
+    class ThreadedXMLRPCServer(ThreadingMixIn, SimpleXMLRPCServer):
+        pass
+    server = ThreadedXMLRPCServer(("0.0.0.0", port), requestHandler=RequestHandler)
     class Dispatcher:
         def __init__(self, classes):
             self.classes = classes
         def execute(self, command, params):
+            # do it as separate thread 
             print("Executing %s with params %s" % (command , params))
-            result = execute_command(self.classes, command, params)
+            result = None
+            try:
+                result = execute_command(self.classes, command, params)
+            except Exception as e:
+                print("Error: %s" % e)
+                print(traceback.format_exc())
+                raise e 
             print("Result: %s" % result)
             if isinstance(result, Path):
                 return str(result)

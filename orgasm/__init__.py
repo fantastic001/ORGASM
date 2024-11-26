@@ -4,7 +4,7 @@ import sys
 import traceback
 from typing import Dict 
 import inspect 
-from command_executor.command_class_inspector import * 
+from orgasm.command_class_inspector import * 
 from xmlrpc.server import SimpleXMLRPCServer
 from xmlrpc.server import SimpleXMLRPCRequestHandler
 from socketserver import ThreadingMixIn

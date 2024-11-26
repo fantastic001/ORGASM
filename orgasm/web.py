@@ -1,5 +1,5 @@
 
-from command_executor import execute_command, get_command_specs
+from orgasm import execute_command, get_command_specs
 from pathlib import Path
 
 # Flask application serving the web interface

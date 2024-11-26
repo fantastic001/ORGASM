@@ -3,7 +3,7 @@
 from setuptools import setup
 setup(
     name='command_executor',
-    version='0.1',
+    version='1.0',
     packages=['command_executor'],
     author="Stefan Nožinić",
     author_email="stefan@lugons.org",

@@ -3,7 +3,17 @@ from command_executor import execute_command, get_command_specs
 from pathlib import Path
 
 # Flask application serving the web interface
-def serve_web(classes):
+def serve_web(classes, command_view_templates: dict = None, index_template=None, command_result_templates=None):
+    """
+    classes: list of classes with command methods
+    command_view_templates: 
+        dict with template files for web interface. Keys represent respective commands. 
+        Values are paths to template files.
+        If command is not in the dict, default template will be used.
+    index_template: path to index template file. If None, default template will be used.
+    command_result_templates: dict with template files for command results. Keys represent respective commands.
+
+    """
     from flask import Flask, render_template, request, jsonify, redirect, url_for, render_template_string
 
     app = Flask(__name__)
@@ -27,12 +37,12 @@ def serve_web(classes):
                 </ul>
             </body>
         </html>
-        ''', commands=commands)
+        ''', commands=commands) if index_template is None else render_template(index_template, commands=commands)
         return html
 
-    @app.route('/command', methods=['POST'])
+    @app.route('/command', methods=['POST', 'GET'])
     def command():
-        command = request.form['command']
+        command = request.form['command'] if "command" not in request.args else request.args['command']
         params = {} 
         specs = get_command_specs(classes)
         command = next((c for c in specs if c['name'] == command), None)
@@ -41,6 +51,8 @@ def serve_web(classes):
         print("Command: ", command['name'])
         print("Args: ", command['args'])
         print("Request form: ", request.form)
+        if request.method == 'GET' and len(command['args']) > 0:
+            return redirect(url_for('command_view', command=command['name']))
         for arg in command['args']:
             if arg['name'] in request.form and request.form[arg['name']] not in [None, ""]:
                 params[arg['name']] = arg['type'](request.form[arg['name']])
@@ -66,7 +78,10 @@ def serve_web(classes):
                 <p>{{ result }}</p>
             </body>
         </html>
-        ''', result=result)
+        ''', result=result) if (
+                command_result_templates is None or 
+                command['name'] not in command_result_templates 
+            ) else render_template(command_result_templates[command['name']], result=result)
     
 
     @app.route('/command_specs')
@@ -98,6 +113,8 @@ def serve_web(classes):
         }
         if command is None:
             return 'Command not found', 404
+        if len(command['args']) == 0:
+            return redirect(url_for('command', command=command['name']))
         html = render_template_string('''
         <html>
             <head>
@@ -128,7 +145,10 @@ def serve_web(classes):
         ''', 
             command=command, 
             type_input_mapping=type_input_mapping,
-        )
+        ) if (
+            command_view_templates is None or 
+            command['name'] not in command_view_templates 
+        ) else render_template(command_view_templates[command['name']], command=command, type_input_mapping=type_input_mapping)
         return html
 
     app.run(port=8080, debug=True)

@@ -144,7 +144,8 @@ def command_executor_main(classes):
         raise e
 
 def get_classes(module_name):
-    module = __import__(module_name)
+    import importlib
+    module = importlib.import_module(module_name)
     names = dir(module)
     if hasattr(module, "COMMAND_CLASSES"):
         names = getattr(module, "COMMAND_CLASSES")

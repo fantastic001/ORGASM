@@ -3,7 +3,7 @@
 from setuptools import setup
 setup(
     name='orgasm-package',
-    version='1.0',
+    version='1.1',
     packages=['orgasm'],
     author="Stefan Nožinić",
     author_email="stefan@lugons.org",

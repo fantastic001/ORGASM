@@ -11,3 +11,4 @@ install via pip:
 pip install orgasm-package
 ```
 
+See `example.py` for example as well as `example_commands.py`

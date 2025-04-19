@@ -9,6 +9,11 @@ from xmlrpc.server import SimpleXMLRPCServer
 from xmlrpc.server import SimpleXMLRPCRequestHandler
 from socketserver import ThreadingMixIn
 import xmlrpc.client
+try:
+    import argcomplete
+except ImportError:
+    argcomplete = None
+
 
 def get_command_specs(classes):
     spec = []
@@ -161,6 +166,8 @@ def command_executor_main(classes, explicit_params=True):
                         help=arg["help"],
                         action="store_true" 
                     )    
+    if argcomplete is not None:
+        argcomplete.autocomplete(parser)
     args, _ = parser.parse_known_args()
     if args.command is None:
         parser.print_help()

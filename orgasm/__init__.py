@@ -109,6 +109,7 @@ def command_executor_main(classes, explicit_params=True):
     commands: Dict[str, argparse.ArgumentParser] = {}
     for command in spec:
         commands[command["name"]] = command_parsers.add_parser(command["name"])
+        short_options = set()
         for arg in command["args"]:
             parser_params = {}
             if arg["type"] != bool:
@@ -121,20 +122,45 @@ def command_executor_main(classes, explicit_params=True):
                         action="store" 
                     )
                 else:
+                    short = ""
+                    if arg["name"][0] not in short_options:
+                        short = "-%s " % arg["name"][0]
+                        short_options.add(arg["name"][0])
+                    if short != "":
+                        commands[command["name"]].add_argument(short, "--%s" % arg["name"].replace("_", "-"),
+                            required=arg["required"], 
+                            type=arg["type"],
+                            help=arg["help"],
+                            choices=arg["valid_values"],
+                            default=arg.get("default", None),
+                            action="store" 
+                        )
+                    else:
+                        commands[command["name"]].add_argument("--%s" % arg["name"].replace("_", "-"),
+                            required=arg["required"], 
+                            type=arg["type"],
+                            help=arg["help"],
+                            choices=arg["valid_values"],
+                            default=arg.get("default", None),
+                            action="store" 
+                        )
+            else:
+                short = ""
+                if arg["name"][0] not in short_options:
+                    short = "-%s " % arg["name"][0]
+                    short_options.add(arg["name"][0])
+                if short != "":
+                    commands[command["name"]].add_argument(short, "--%s" % arg["name"].replace("_", "-"),
+                        required=arg["required"], 
+                        help=arg["help"],
+                        action="store_true" 
+                    )
+                else:
                     commands[command["name"]].add_argument("--%s" % arg["name"].replace("_", "-"),
                         required=arg["required"], 
-                        type=arg["type"],
                         help=arg["help"],
-                        choices=arg["valid_values"],
-                        default=arg.get("default", None),
-                        action="store" 
-                    )
-            else:
-                commands[command["name"]].add_argument("--%s" % arg["name"].replace("_", "-"),
-                    required=arg["required"], 
-                    help=arg["help"],
-                    action="store_true" 
-                )    
+                        action="store_true" 
+                    )    
     args, _ = parser.parse_known_args()
     if args.command is None:
         parser.print_help()

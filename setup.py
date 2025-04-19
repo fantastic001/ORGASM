@@ -3,7 +3,7 @@
 from setuptools import setup
 setup(
     name='orgasm-package',
-    version='1.1',
+    version='1.2',
     packages=['orgasm'],
     author="Stefan Nožinić",
     author_email="stefan@lugons.org",
@@ -12,6 +12,7 @@ setup(
     keywords="command line tool",
     url="https://github.com/fantastic001/ORGASM",
     install_requires=[
-        'argparse'
+        'argparse',
+        "argcomplete"
     ]
 )

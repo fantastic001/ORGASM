@@ -29,3 +29,6 @@ class Commands2:
 class Commands3:
     def test3(self):
         return "This is test3"
+    
+    def sum(self, a: int, b: int, *, c: int=0):
+        return a + b + c

@@ -88,7 +88,19 @@ def execute_command(classes, command: str, params):
             return m(**A)
     raise ValueError("Command %s not found" % command)
 
-def command_executor_main(classes):
+def command_executor_main(classes, explicit_params=True):
+    """
+    Command line interface for executing commands in classes.
+    :param classes: list of classes to execute commands from
+    :param explicit_params: if True, all parameters must be specified in the command line which are required for the command. If False, then only values for these parameters which are not default values must be specified.
+
+    Example:
+    if we have class with method `def foo(self, a: int, *, b: str = "default", c: str = "default")` then:
+    if explicit_params = True, then we must specify all parameters in the command line:
+        app foo --a 1 
+    if explicit_params = False, then we can specify only the parameters which are not default values:
+        app foo 1 
+    """
     if not isinstance(classes, list):
         classes = [classes]
     parser = argparse.ArgumentParser()
@@ -100,14 +112,23 @@ def command_executor_main(classes):
         for arg in command["args"]:
             parser_params = {}
             if arg["type"] != bool:
-                commands[command["name"]].add_argument("--%s" % arg["name"].replace("_", "-"),
-                    required=arg["required"], 
-                    type=arg["type"],
-                    help=arg["help"],
-                    choices=arg["valid_values"],
-                    default=arg.get("default", None),
-                    action="store" 
-                )
+                if not explicit_params and arg["required"]:
+                    commands[command["name"]].add_argument("%s" % arg["name"].replace("_", "-"),
+                        type=arg["type"],
+                        help=arg["help"],
+                        choices=arg["valid_values"],
+                        default=arg.get("default", None),
+                        action="store" 
+                    )
+                else:
+                    commands[command["name"]].add_argument("--%s" % arg["name"].replace("_", "-"),
+                        required=arg["required"], 
+                        type=arg["type"],
+                        help=arg["help"],
+                        choices=arg["valid_values"],
+                        default=arg.get("default", None),
+                        action="store" 
+                    )
             else:
                 commands[command["name"]].add_argument("--%s" % arg["name"].replace("_", "-"),
                     required=arg["required"], 

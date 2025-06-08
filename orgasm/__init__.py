@@ -119,7 +119,7 @@ def command_executor_main(classes, explicit_params=True):
             parser_params = {}
             if arg["type"] != bool:
                 if not explicit_params and arg["required"]:
-                    commands[command["name"]].add_argument("%s" % arg["name"].replace("_", "-"),
+                    commands[command["name"]].add_argument("%s" % arg["name"],
                         type=arg["type"],
                         help=arg["help"],
                         choices=arg["valid_values"],

@@ -33,5 +33,5 @@ class Commands3:
     def sum(self, a: int, b: int, *, c: int=0):
         return a + b + c
     
-    def mul(self, a1: int, a2: int, *, k1: int=1, k2: int=1):
-        return a1 * a2 * k1 * k2
+    def mul(self, a_1: int, a_2: int, *, k1: int=1, k2: int=1):
+        return a_1 * a_2 * k1 * k2

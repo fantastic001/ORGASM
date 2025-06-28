@@ -1,5 +1,8 @@
+import http
 from pathlib import Path
 from orgasm import attr, tag 
+
+from orgasm.http_rest import http_get, no_http
 
 COMMAND_CLASSES = ["Commands", "Commands2", "Commands3"]
 
@@ -12,8 +15,11 @@ class Commands:
 
     @attr(myattr=5)
     @tag("haha")
+    @no_http
     def test(self):
         return "This is test" 
+    
+    @http_get
     def test_path(self, path: Path, *, full_path: bool=False):
         if full_path:
             return path.resolve()

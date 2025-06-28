@@ -2,7 +2,9 @@ import http
 from pathlib import Path
 from orgasm import attr, tag 
 
-from orgasm.http_rest import http_get, no_http
+from orgasm.http_rest import http_get, json_save_to_db, no_http
+from orgasm.http_rest import http_auth_json_file, issue_token
+
 
 COMMAND_CLASSES = ["Commands", "Commands2", "Commands3"]
 
@@ -32,8 +34,17 @@ class Commands:
 
 
 class Commands2:
-    def test2(self):
-        return "This is test2"
+    TOKENS_PATH = "tokens.json"
+
+    @http_auth_json_file(TOKENS_PATH, user_arg="user")
+    @http_get
+    def test2(self, user: str):
+        return "This is test2 for user: " + user
+    
+    def generate_token(self, user_id: str):
+        return issue_token(user_id, json_save_to_db(self.TOKENS_PATH))
+    
+
 
 
 class Commands3:

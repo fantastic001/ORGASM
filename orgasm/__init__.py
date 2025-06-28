@@ -15,6 +15,65 @@ except ImportError:
     argcomplete = None
 
 
+class SuperFunction:
+    def __init__(self, func, tags = None, attrs = None):
+        self.func = func
+        self.tags = tags if tags is not None else []
+        self.attrs = attrs if attrs is not None else {}
+    
+    def __call__(self, *args, **kwargs):
+        return self.func(*args, **kwargs)
+    
+    def __getitem__(self, item):
+        if item in self.attrs:
+            return self.attrs[item]
+        raise KeyError("Attribute %s not found" % item)
+    
+    def __setitem__(self, key, value):
+        self.attrs[key] = value
+    
+    def __iter__(self):
+        return iter(self.tags)
+    
+def is_super_function(obj):
+    """
+    Check if the object is a SuperFunction.
+    :param obj: object to check
+    :return: True if the object is a SuperFunction, False otherwise
+    """
+    return isinstance(obj, SuperFunction)
+
+def attr(**kwargs):
+    """
+    Decorator to add an attribute to a function.
+    :param key: attribute key
+    :param value: attribute value
+    :return: decorated function
+    """
+    def decorator(func):
+        if not is_super_function(func):
+            func = SuperFunction(func)
+        for key, value in kwargs.items():
+            func[key] = value
+        return func
+    return decorator
+
+def tag(*tags):
+    """
+    Decorator to add tags to a function.
+    :param tags: tags to add
+    :return: decorated function
+    """
+    def decorator(func):
+        if not is_super_function(func):
+            func = SuperFunction(func)
+        for tag in tags:
+            func.tags.append(tag)
+        return func
+    return decorator
+
+
+
 def get_command_specs(classes):
     spec = []
     available_commands = []
@@ -23,24 +82,27 @@ def get_command_specs(classes):
     for command in available_commands:
         for cls in classes:
             if hasattr(cls, command):
+                f = getattr(cls, command)
+                if is_super_function(f):
+                    f = f.func
                 args = [] 
-                for arg in get_arguments(getattr(cls, command)):
+                for arg in get_arguments(f):
                     args.append({
                         "name": arg,
                         "required": True,
-                        "type": get_arg_type(getattr(cls, command), arg),
-                        "help": get_arg_description(getattr(cls, command), arg),
+                        "type": get_arg_type(f, arg),
+                        "help": get_arg_description(f, arg),
                     })
                     if hasattr(cls, "VALID_VALUES") and getattr(cls, "VALID_VALUES").get(command, {}).get(arg, None) is not None:
                         args[-1]["valid_values"] = getattr(cls, "VALID_VALUES")[command][arg]
                     else:
                         args[-1]["valid_values"] = None
-                for arg, value in get_optional_arguments(getattr(cls, command)):
+                for arg, value in get_optional_arguments(f):
                     args.append({
                         "name": arg,
                         "required": False,
-                        "type": get_arg_type(getattr(cls, command), arg),
-                        "help": get_arg_description(getattr(cls, command), arg),
+                        "type": get_arg_type(f, arg),
+                        "help": get_arg_description(f, arg),
                         "default": value
                     })
                     if hasattr(cls, "VALID_VALUES") and getattr(cls, "VALID_VALUES").get(command, {}).get(arg, None) is not None:
@@ -50,7 +112,9 @@ def get_command_specs(classes):
                 spec.append({
                     "name": command,
                     "args": args,
-                    "method_name": command
+                    "method_name": command,
+                    "attrs": getattr(cls, command).attrs if  is_super_function(getattr(cls, command)) else {},
+                    "tags": getattr(cls, command).tags if is_super_function(getattr(cls, command)) else []
                 })
     return spec
 
@@ -90,7 +154,10 @@ def execute_command(classes, command: str, params):
                 if arg["valid_values"] is not None:
                     if A[arg["name"]] not in arg["valid_values"]:
                         raise ValueError("Invalid value %s for argument %s" % (A[arg], arg))
-            return m(**A)
+            if is_super_function(m):
+                return m(executor, **A)
+            else:
+                return m(**A)
     raise ValueError("Command %s not found" % command)
 
 def command_executor_main(classes, explicit_params=True):

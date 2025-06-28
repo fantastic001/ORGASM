@@ -1,4 +1,5 @@
 from pathlib import Path
+from orgasm import attr, tag 
 
 COMMAND_CLASSES = ["Commands", "Commands2", "Commands3"]
 
@@ -9,6 +10,8 @@ class Commands:
         }
     }
 
+    @attr(myattr=5)
+    @tag("haha")
     def test(self):
         return "This is test" 
     def test_path(self, path: Path, *, full_path: bool=False):
@@ -17,6 +20,7 @@ class Commands:
         else:
             return path.name
     
+    @tag("status")
     def test_status(self, *, status: int=0):
         return status
 

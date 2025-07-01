@@ -110,7 +110,7 @@ def http_auth_json_file(path: str, user_arg=None):
 
 
 
-def serve_rest_api(classes, port=5000):
+def serve_rest_api(classes, port=5000, host="127.0.0.1"):
     app = Flask(__name__)
 
     @app.route('/commands', methods=['GET'])
@@ -171,4 +171,4 @@ def serve_rest_api(classes, port=5000):
         print(f"Adding endpoint: {spec['method_name']} with method {method}")
         app.add_url_rule(f'/{spec["method_name"]}', spec["method_name"], command_endpoint, methods=[method])
 
-    app.run(port=port)
+    app.run(port=port, host=host)

@@ -35,6 +35,15 @@ class SuperFunction:
     def __iter__(self):
         return iter(self.tags)
     
+    def __get__(self, obj, owner = None):
+        """
+        This method is called when the function is accessed as an attribute of an object.
+        It allows the function to be called with the object as the first argument.
+        """
+        if obj is None:
+            return self
+        return lambda *args, **kwargs: self.func(obj, *args, **kwargs)
+    
 def is_super_function(obj):
     """
     Check if the object is a SuperFunction.

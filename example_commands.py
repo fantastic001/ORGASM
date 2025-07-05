@@ -56,3 +56,10 @@ class Commands3:
     
     def mul(self, a_1: int, a_2: int, *, k1: int=1, k2: int=1):
         return a_1 * a_2 * k1 * k2
+        
+    @tag("test4")
+    def test4(self):
+        return "This is test4"
+    
+    def test5(self):
+        return self.test4() + " and " + self.test3()

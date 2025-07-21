@@ -106,6 +106,10 @@ def launch_repl(classes):
                     # if it ends with a quote, we can add it to args
                     args.append(" ".join(parts[quoted_part_start:i + 2]))
                     quoted_part_start = None
+                if quoted_part_start is None:
+                    # if we are not in a quoted part, we can add the part as is
+                    args.append(part)
+                
             command = command.strip()
             args = [arg.strip() for arg in args if arg.strip()]
             if command not in [c["name"] for c in specs]:
@@ -124,6 +128,10 @@ def launch_repl(classes):
             for arg in command_spec.get("args", []):
                 if arg["name"] not in kwargs and "default" in arg:
                     kwargs[arg["name"]] = arg["default"]
+                    continue  # If the argument is not provided, use the default value
+                if arg["name"] not in kwargs:
+                    print(f"Missing required argument: {arg['name']}")
+                    continue
                 # cast the argument to the specified type if it exists
                 if "type" in arg:
                     if arg["type"] == bool:
@@ -158,9 +166,12 @@ def launch_repl(classes):
                     else:
                         kwargs[arg["name"]] = arg["type"](kwargs[arg["name"]])
             # Execute the command
-            result = execute_command(classes, command, kwargs)
-            if result is not None:
-                print(result)
+            try:
+                result = execute_command(classes, command, kwargs)
+                if result is not None:
+                    print(result)
+            except Exception as e:
+                print(str(e))
         except KeyboardInterrupt:
             continue  # Control-C pressed. Try again.
         except EOFError:

@@ -54,7 +54,7 @@ class CommandCompleter(Completer):
                                         valid_values = arg["valid_values"]()
                                     else:
                                         valid_values = arg["valid_values"]
-                                    return [Completion(value) for value in valid_values]
+                                    return [Completion(str(value)) for value in valid_values]
                                 else:
                                     # check type of argument
                                     if arg.get("type") == bool:

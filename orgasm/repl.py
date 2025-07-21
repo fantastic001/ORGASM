@@ -49,7 +49,7 @@ class CommandCompleter(Completer):
                         for arg in command.get("args", []):
                             if arg["name"] == arg_name:
                                 # if the argument has valid values, we complete them
-                                if "valid_values" in arg:
+                                if "valid_values" in arg and arg["valid_values"] is not None:
                                     if callable(arg["valid_values"]):
                                         valid_values = arg["valid_values"]()
                                     else:
@@ -57,7 +57,7 @@ class CommandCompleter(Completer):
                                     return [Completion(value) for value in valid_values]
                                 else:
                                     # check type of argument
-                                    if arg.get("type") == "bool":
+                                    if arg.get("type") == bool:
                                         # if it's a boolean, we complete with true and false
                                         return [Completion("true"),
                                                 Completion("false")]
@@ -108,21 +108,21 @@ def launch_repl(classes):
                     kwargs[arg["name"]] = arg["default"]
                 # cast the argument to the specified type if it exists
                 if "type" in arg:
-                    if arg["type"] == "bool":
+                    if arg["type"] == bool:
                         kwargs[arg["name"]] = kwargs[arg["name"]].lower() in ["true", "1", "yes"]
-                    elif arg["type"] == "int":
+                    elif arg["type"] == int:
                         try:
                             kwargs[arg["name"]] = int(kwargs[arg["name"]])
                         except ValueError:
                             print(f"Invalid integer value for {arg['name']}: {kwargs[arg['name']]}")
                             continue
-                    elif arg["type"] == "float":
+                    elif arg["type"] == float:
                         try:
                             kwargs[arg["name"]] = float(kwargs[arg["name"]])
                         except ValueError:
                             print(f"Invalid float value for {arg['name']}: {kwargs[arg['name']]}")
                             continue
-                    elif arg["type"] == "str":
+                    elif arg["type"] == str:
                         if kwargs[arg["name"]].startswith('"') and kwargs[arg["name"]].endswith('"'):
                             kwargs[arg["name"]] = kwargs[arg["name"]][1:-1]
                         elif kwargs[arg["name"]].startswith("'") and kwargs[arg["name"]].endswith("'"):
@@ -130,8 +130,15 @@ def launch_repl(classes):
                         else:
                             # If it's not quoted, we assume it's a string but don't change it
                             pass
-                    elif arg["type"] == "Path":
-                        kwargs[arg["name"]] = Path(kwargs[arg["name"]])
+                    elif arg["type"] == Path:
+                        if kwargs[arg["name"]].startswith('"') and kwargs[arg["name"]].endswith('"'):
+                            kwargs[arg["name"]] = Path(kwargs[arg["name"]][1:-1])
+                        elif kwargs[arg["name"]].startswith("'") and kwargs[arg["name"]].endswith("'"):
+                            kwargs[arg["name"]] = Path(kwargs[arg["name"]][1:-1])
+                        else:
+                            kwargs[arg["name"]] = Path(kwargs[arg["name"]])
+                    else:
+                        kwargs[arg["name"]] = arg["type"](kwargs[arg["name"]])
             # Execute the command
             result = execute_command(classes, command, kwargs)
             if result is not None:

@@ -42,7 +42,7 @@ class CommandCompleter(Completer):
                     if document.text_before_cursor.endswith(" "):
                         # we autocomplete available arguments 
                         result =  [arg["name"] + "=" for arg in command.get("args", [])]
-                        return [Completion(text, start_position=-len(document.text_before_cursor)) for text in result]
+                        return [Completion(text) for text in result]
                     elif document.text_before_cursor.endswith("="):
                         # find the argument we are completing
                         arg_name = document.text_before_cursor.split()[-1][:-1]
@@ -54,13 +54,13 @@ class CommandCompleter(Completer):
                                         valid_values = arg["valid_values"]()
                                     else:
                                         valid_values = arg["valid_values"]
-                                    return [Completion(value, start_position=-len(document.text_before_cursor)) for value in valid_values]
+                                    return [Completion(value) for value in valid_values]
                                 else:
                                     # check type of argument
                                     if arg.get("type") == "bool":
                                         # if it's a boolean, we complete with true and false
-                                        return [Completion("true", start_position=-len(document.text_before_cursor)),
-                                                Completion("false", start_position=-len(document.text_before_cursor))]
+                                        return [Completion("true"),
+                                                Completion("false")]
                                     else:
                                         return [] 
         # If no command matches, return an empty list.

@@ -87,7 +87,25 @@ def launch_repl(classes):
             text = session.prompt("> ")
             if text.strip() == "":
                 continue  # Skip empty input
-            command, *args = text.split()
+            # Split the input into command and arguments
+            # format is:
+            # command arg1=value1 arg2=value2 ...
+            # We assume the first word is the command and the rest are arguments
+            # values can be quoted with single or double quotes and can contain spaces
+            parts = text.split()
+            command = parts[0]
+            # if we have this: arg="value with spaces" we need to handle it correctly
+            args = [] 
+            quoted_part_start = None
+            for i, part in enumerate(parts[1:]):
+                if part.split("=")[-1].startswith('"'):
+                    if quoted_part_start is None:
+                        quoted_part_start = i + 1
+                    # if we are in a quoted part, we continue to the next part
+                if part.endswith('"') and quoted_part_start is not None:
+                    # if it ends with a quote, we can add it to args
+                    args.append(" ".join(parts[quoted_part_start:i + 2]))
+                    quoted_part_start = None
             command = command.strip()
             args = [arg.strip() for arg in args if arg.strip()]
             if command not in [c["name"] for c in specs]:

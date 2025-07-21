@@ -1,4 +1,5 @@
 import argparse
+import itertools
 from pathlib import Path
 import sys
 import traceback
@@ -103,7 +104,13 @@ def get_command_specs(classes):
                         "help": get_arg_description(f, arg),
                     })
                     if hasattr(cls, "VALID_VALUES") and getattr(cls, "VALID_VALUES").get(command, {}).get(arg, None) is not None:
-                        args[-1]["valid_values"] = getattr(cls, "VALID_VALUES")[command][arg]
+                        g = getattr(cls, "VALID_VALUES")[command][arg]
+                        if callable(g):
+                            args[-1]["valid_values"] = g()
+                        elif hasattr(g, "__iter__") and not isinstance(g, str):
+                            args[-1]["valid_values"] = list(g)
+                        else:
+                            args[-1]["valid_values"] = [g]
                     else:
                         args[-1]["valid_values"] = None
                 for arg, value in get_optional_arguments(f):
@@ -115,7 +122,13 @@ def get_command_specs(classes):
                         "default": value
                     })
                     if hasattr(cls, "VALID_VALUES") and getattr(cls, "VALID_VALUES").get(command, {}).get(arg, None) is not None:
-                        args[-1]["valid_values"] = getattr(cls, "VALID_VALUES")[command][arg]
+                        g = getattr(cls, "VALID_VALUES")[command][arg]
+                        if callable(g):
+                            args[-1]["valid_values"] = g()
+                        elif hasattr(g, "__iter__") and not isinstance(g, str):
+                            args[-1]["valid_values"] = list(g)
+                        else:
+                            args[-1]["valid_values"] = [g]
                     else:
                         args[-1]["valid_values"] = None
                 spec.append({

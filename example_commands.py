@@ -11,7 +11,8 @@ COMMAND_CLASSES = ["Commands", "Commands2", "Commands3"]
 class Commands:
     VALID_VALUES = {
         "test_status": {
-            "status": [0,1,2]
+            "status": lambda: [0, 1, 2, 3, 4, 5],
+            "status2": [1,2]
         }
     }
 
@@ -29,7 +30,7 @@ class Commands:
             return path.name
     
     @tag("status")
-    def test_status(self, *, status: int=0):
+    def test_status(self, *, status: int=0, status2: int=1):
         return status
 
 

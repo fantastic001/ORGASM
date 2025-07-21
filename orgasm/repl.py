@@ -1,6 +1,7 @@
 
 #!/usr/bin/env python
 from pathlib import Path
+import re
 import sqlite3
 import sys
 from typing import Iterable
@@ -29,20 +30,42 @@ class CommandCompleter(Completer):
         # Get list of words.
         spec = self.spec
         first_word_in_line = document.text.split()[0] if document.text else ""
-        if first_word_in_line == "":
-            result =  [c["name"] for c in spec]
+        cursor_position = document.cursor_position
+        chars_before_space = document.text_before_cursor.rfind(" ")
+        chars_before_equals = document.text_before_cursor.rfind("=")
+        current_word = ""
+        quotes_num = document.text_before_cursor.count('"') + document.text_before_cursor.count("'")
+        displacement_after_space = len(document.text_before_cursor) - chars_before_space - 1
+        displacement_after_equals = len(document.text_before_cursor) - chars_before_equals - 1
+        if chars_before_space != -1:
+            # If there is a space before the cursor, we take the word after the last space.
+            current_word = document.text_before_cursor[chars_before_space + 1:]
+        else:
+            # If there is no space, we take the whole text before the cursor.
+            current_word = document.text_before_cursor
+        if first_word_in_line == "" or cursor_position <= len(first_word_in_line):
+            result =  [c["name"] for c in spec if first_word_in_line in c["name"]]
             return [Completion(text, start_position=-len(document.text_before_cursor)) for text in result]
         else:
             # Find the command spec that matches the first word.
             for command in spec:
                 if command["name"] == first_word_in_line:
+                    # collect all arguments already inputed
+                    existing_args = [] 
+                    for part in document.text.split():
+                        if part.startswith(first_word_in_line):
+                            continue
+                        if "=" in part and re.match(r"^[a-zA-Z0-9_]+$", part.split("=")[0]):
+                            # we only add the argument name, not the value
+                            existing_args.append(part.split("=")[0])
                     # now check if we started inputing arguments
                     # this means our cursor is not at first word and 
                     # there is a space before the cursor
-                    if document.text_before_cursor.endswith(" "):
+                    if (document.text_before_cursor.endswith(" ") or "=" not in current_word) and quotes_num % 2 == 0:
                         # we autocomplete available arguments 
-                        result =  [arg["name"] + "=" for arg in command.get("args", [])]
-                        return [Completion(text) for text in result]
+                        result =  [arg["name"] for arg in command.get("args", []) if arg["name"].startswith(current_word)]
+                        result = [text for text in result if text not in existing_args]
+                        return [Completion(text+"=", start_position=-displacement_after_space) for text in result]
                     elif document.text_before_cursor.endswith("="):
                         # find the argument we are completing
                         arg_name = document.text_before_cursor.split()[-1][:-1]
@@ -54,7 +77,7 @@ class CommandCompleter(Completer):
                                         valid_values = arg["valid_values"]()
                                     else:
                                         valid_values = arg["valid_values"]
-                                    return [Completion(str(value)) for value in valid_values]
+                                    return [Completion(str(value), start_position=displacement_after_equals) for value in valid_values]
                                 else:
                                     # check type of argument
                                     if arg.get("type") == bool:
@@ -106,7 +129,7 @@ def launch_repl(classes):
                     # if it ends with a quote, we can add it to args
                     args.append(" ".join(parts[quoted_part_start:i + 2]))
                     quoted_part_start = None
-                if quoted_part_start is None:
+                elif quoted_part_start is None:
                     # if we are not in a quoted part, we can add the part as is
                     args.append(part)
                 

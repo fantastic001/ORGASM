@@ -39,10 +39,20 @@ def get_result_widget(result: Any) -> QWidget:
         label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         layout.addWidget(label)
     elif isinstance(result, dict):
-        for key, value in result.items():
-            label = QLabel(f"{key}: {value}")
-            label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-            layout.addWidget(label)
+        # create a scrollable table
+        table = QTableWidget(len(result.keys()), 2)
+        table.setHorizontalHeaderLabels(["Key", "Value"])
+        for row_idx, (key, value) in enumerate(result.items()):
+            key_item = QTableWidgetItem(str(key))
+            value_item = QTableWidgetItem(str(value))
+            table.setItem(row_idx, 0, key_item)
+            table.setItem(row_idx, 1, value_item)
+        # enable copy functionality
+        table.setSelectionMode(QTableWidget.SelectionMode.ExtendedSelection)
+        table.resizeRowsToContents()
+        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)  # make it read-only
+        table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectItems)
+        layout.addWidget(table)    
     elif isinstance(result, list):
         if len(result) == 0:
             label = QLabel("No results returned.")

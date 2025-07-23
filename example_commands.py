@@ -26,6 +26,8 @@ class Commands:
         return ["item1", "item2", "item3"]
     def show_table(self):
         return [{"col1": "value1", "col2": "value2"}, {"col1": "value3", "col2": "value4"}]
+    def show_dict(self):
+        return {"key1": "value1", "key2": "value2"}
     @http_get
     def test_path(self, path: Path, *, full_path: bool=False):
         if full_path:

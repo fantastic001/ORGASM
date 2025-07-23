@@ -17,6 +17,10 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QVBoxLayout,
     QCheckBox,
+    QDialog,
+    QLabel,
+    QTableWidget,
+    QTableWidgetItem,
 )
 from PySide6.QtGui import QIntValidator, QDoubleValidator
 from PySide6.QtCore import Qt
@@ -27,6 +31,40 @@ from orgasm import get_command_specs, execute_command
 FieldSpec = Tuple[str, Type, List[str]]  # (label, kind, options) where kind in {"text", "dropdown"}
 
 
+def get_result_widget(result: Any) -> QWidget:
+    parent = QWidget()
+    layout = QVBoxLayout(parent)
+    if isinstance(result, str) or isinstance(result, int) or isinstance(result, float):
+        label = QLabel(str(result))
+        label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        layout.addWidget(label)
+    elif isinstance(result, dict):
+        for key, value in result.items():
+            label = QLabel(f"{key}: {value}")
+            label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            layout.addWidget(label)
+    elif isinstance(result, list):
+        if len(result) == 0:
+            label = QLabel("No results returned.")
+            layout.addWidget(label)
+        else:
+            if isinstance(result[0], dict):
+                # create a scrollable table
+                table = QTableWidget(len(result), len(result[0]))
+                table.setHorizontalHeaderLabels(result[0].keys())
+                for row_idx, row in enumerate(result):
+                    for col_idx, (key, value) in enumerate(row.items()):
+                        item = QTableWidgetItem(str(value))
+                        table.setItem(row_idx, col_idx, item)
+                layout.addWidget(table)
+            else:
+                list_widget = QListWidget()
+                for item in result:
+                    list_widget.addItem(str(item))
+                layout.addWidget(list_widget)
+    else:
+        raise ValueError(f"Unsupported result type: {type(result)}")
+    return parent
 
 class ActionWidget(QWidget):
     """Generic widget composed of input fields and an execute button."""
@@ -45,37 +83,50 @@ class ActionWidget(QWidget):
         self._inputs: Dict[str, Tuple[QWidget, Type]] = {}
 
         layout = QVBoxLayout(self)
-        form = QFormLayout()
+        if fields:
+            form = QFormLayout()
 
-        # build inputs according to field spec
-        for label, kind, options in fields: 
-            if options:
-                w = QComboBox()
-                w.addItems([str(o) for o in options])
-            elif kind == str:
-                w = QLineEdit()
-            elif kind == bool:
-                w = QCheckBox(label)
-            elif kind == Path:
-                w = QLineEdit()
-            elif kind == int:
-                w = QLineEdit()
-                w.setValidator(QIntValidator())
-            elif kind == float:
-                w = QLineEdit()
-                w.setValidator(QDoubleValidator())
+            # build inputs according to field spec
+            for label, kind, options in fields: 
+                if options:
+                    w = QComboBox()
+                    w.addItems([str(o) for o in options])
+                elif kind == str:
+                    w = QLineEdit()
+                elif kind == bool:
+                    w = QCheckBox(label)
+                elif kind == Path:
+                    w = QLineEdit()
+                elif kind == int:
+                    w = QLineEdit()
+                    w.setValidator(QIntValidator())
+                elif kind == float:
+                    w = QLineEdit()
+                    w.setValidator(QDoubleValidator())
+                else:
+                    raise ValueError(f"Unknown widget type: {kind}")
+                self._inputs[label] = (w, kind)
+                form.addRow(label + ":", w)
+
+            layout.addLayout(form)
+
+            # add result display area
+            self.result_widget = QWidget(self)
+            self.result_widget.setLayout(QVBoxLayout())
+            layout.addWidget(self.result_widget)
+
+            # execute button
+            exec_btn = QPushButton("Execute")
+            exec_btn.clicked.connect(self._on_execute_clicked)
+            layout.addWidget(exec_btn, alignment=Qt.AlignmentFlag.AlignRight)
+        else:
+            result = self._execute_callback(self._action_name, {})
+            result_widget = get_result_widget(result)
+            if isinstance(result_widget, QWidget):
+                layout.addWidget(result_widget)
             else:
-                raise ValueError(f"Unknown widget type: {kind}")
-            self._inputs[label] = (w, kind)
-            form.addRow(label + ":", w)
-
-        layout.addLayout(form)
-
-        # execute button
-        exec_btn = QPushButton("Execute")
-        exec_btn.clicked.connect(self._on_execute_clicked)
-        layout.addWidget(exec_btn, alignment=Qt.AlignmentFlag.AlignRight)
-
+                raise ValueError("Result widget must be a QWidget instance.")
+            
     # ---------------------------------------------------------------------
     def _collect_values(self) -> Dict[str, str]:
         values: Dict[str, Any] = {}
@@ -94,7 +145,16 @@ class ActionWidget(QWidget):
         values = self._collect_values()
         try:
             result = self._execute_callback(self._action_name, values)
-            QMessageBox.information(self, "Result", str(result), QMessageBox.StandardButton.Ok)
+            result_widget = get_result_widget(result)
+            if isinstance(result_widget, QWidget):
+                # clear previous result
+                for i in reversed(range(self.result_widget.layout().count())):
+                    item = self.result_widget.layout().itemAt(i)
+                    if item.widget():
+                        item.widget().deleteLater()
+                self.result_widget.layout().addWidget(result_widget)
+            else:
+                raise ValueError("Result widget must be a QWidget instance.")
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Error", str(exc), QMessageBox.StandardButton.Ok)
 

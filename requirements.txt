@@ -2,3 +2,4 @@ Flask
 argcomplete
 setuptools
 prompt_toolkit 
+PySide6

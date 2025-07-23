@@ -1,0 +1,164 @@
+from ast import Str
+from pathlib import Path
+import sys
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+
+from PySide6.QtWidgets import (
+    QApplication,
+    QComboBox,
+    QListWidget,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QStackedWidget,
+    QFormLayout,
+    QLineEdit,
+    QWidget,
+    QHBoxLayout,
+    QVBoxLayout,
+    QCheckBox,
+)
+from PySide6.QtGui import QIntValidator, QDoubleValidator
+from PySide6.QtCore import Qt
+
+from orgasm import get_command_specs, execute_command
+
+
+FieldSpec = Tuple[str, Type, List[str]]  # (label, kind, options) where kind in {"text", "dropdown"}
+
+
+
+class ActionWidget(QWidget):
+    """Generic widget composed of input fields and an execute button."""
+
+    def __init__(
+        self,
+        action_name: str,
+        fields: List[FieldSpec],
+        execute_callback: Callable[[str, Dict[str, str]], str],
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._action_name = action_name
+        self._execute_callback = execute_callback
+        self._fields = fields
+        self._inputs: Dict[str, Tuple[QWidget, Type]] = {}
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+
+        # build inputs according to field spec
+        for label, kind, options in fields: 
+            if options:
+                w = QComboBox()
+                w.addItems([str(o) for o in options])
+            elif kind == str:
+                w = QLineEdit()
+            elif kind == bool:
+                w = QCheckBox(label)
+            elif kind == Path:
+                w = QLineEdit()
+            elif kind == int:
+                w = QLineEdit()
+                w.setValidator(QIntValidator())
+            elif kind == float:
+                w = QLineEdit()
+                w.setValidator(QDoubleValidator())
+            else:
+                raise ValueError(f"Unknown widget type: {kind}")
+            self._inputs[label] = (w, kind)
+            form.addRow(label + ":", w)
+
+        layout.addLayout(form)
+
+        # execute button
+        exec_btn = QPushButton("Execute")
+        exec_btn.clicked.connect(self._on_execute_clicked)
+        layout.addWidget(exec_btn, alignment=Qt.AlignmentFlag.AlignRight)
+
+    # ---------------------------------------------------------------------
+    def _collect_values(self) -> Dict[str, str]:
+        values: Dict[str, Any] = {}
+        for label, (widget, kind) in self._inputs.items():
+            if isinstance(widget, QComboBox):
+                values[label] = kind(widget.currentText())
+            elif isinstance(widget, QLineEdit):
+                values[label] = kind(widget.text())
+            elif isinstance(widget, QCheckBox):
+                values[label] = widget.isChecked()
+            else:
+                raise ValueError(f"Unsupported widget type: {type(widget)}")
+        return values
+
+    def _on_execute_clicked(self) -> None:
+        values = self._collect_values()
+        try:
+            result = self._execute_callback(self._action_name, values)
+            QMessageBox.information(self, "Result", str(result), QMessageBox.StandardButton.Ok)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "Error", str(exc), QMessageBox.StandardButton.Ok)
+
+def get_widget_type(arg) -> Type:
+    """Return the widget type as a string based on the kind."""
+    return arg["type"]
+
+class MainWindow(QMainWindow):
+    def __init__(self, classes, title) -> None:
+        super().__init__()
+        self.setWindowTitle(title)
+        self.spec = get_command_specs(classes)
+        self.classes = classes
+        central = QWidget()
+        self.setCentralWidget(central)
+
+        root_layout = QHBoxLayout(central)
+
+        # sidebar list
+        self._sidebar = QListWidget()
+        self._sidebar.setFixedWidth(150)
+        self._sidebar.currentRowChanged.connect(self._on_sidebar_changed)
+        root_layout.addWidget(self._sidebar)
+
+        # stacked pages
+        self._stack = QStackedWidget()
+        root_layout.addWidget(self._stack, 1)
+
+        # register actions (label, field specs)
+        actions: Dict[str, List[FieldSpec]] = {
+            cmd["name"]: [
+                (arg["name"], get_widget_type(arg), arg.get("valid_values", []) or []) for arg in cmd.get("args", [])
+            ] for cmd in self.spec
+        }
+
+        for action_name, fields in actions.items():
+            self._sidebar.addItem(action_name)
+            page = ActionWidget(action_name, fields, self._execute_action)
+            self._stack.addWidget(page)
+
+        # select first item by default
+        self._sidebar.setCurrentRow(0)
+
+    # ------------------------------------------------------------------
+    def _on_sidebar_changed(self, index: int) -> None:
+        self._stack.setCurrentIndex(index)
+
+    # ------------------------------------------------------------------
+    def _execute_action(self, action_name: str, values: Dict[str, str]) -> str:
+        """Dispatch execution based on action name. Returns string result."""
+        cmd = next((cmd for cmd in self.spec if cmd["name"] == action_name), None)
+        match cmd:
+            case None:
+                raise ValueError(f"Unknown action: {action_name}")
+            case _:
+                return execute_command(self.classes, cmd["name"], values)
+
+
+
+def create_main_window(classes, title="ORGASM GUI") -> Tuple[QApplication, MainWindow, int]:
+    app = QApplication(sys.argv)
+    main_window = MainWindow(classes, title)
+    main_window.resize(640, 400)
+    main_window.show()
+    return app, main_window, app.exec()
+
+

@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 from PySide6.QtGui import QIntValidator, QDoubleValidator
+from PySide6.QtWidgets import QFileDialog
 from PySide6.QtCore import Qt
 
 from orgasm import get_command_specs, execute_command
@@ -72,6 +73,14 @@ def get_result_widget(result: Any) -> QWidget:
                 for item in result:
                     list_widget.addItem(str(item))
                 layout.addWidget(list_widget)
+    elif isinstance(result, QWidget):
+        # if result is already a QWidget, just return it
+        return result
+    elif isinstance(result, Path):
+        # if result is a Path, display it as a label
+        label = QLabel(str(result))
+        label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        layout.addWidget(label)
     else:
         raise ValueError(f"Unsupported result type: {type(result)}")
     return parent
@@ -106,7 +115,21 @@ class ActionWidget(QWidget):
                 elif kind == bool:
                     w = QCheckBox(label)
                 elif kind == Path:
-                    w = QLineEdit()
+                    txt = QLineEdit()
+                    # add a button to open file dialog
+                    def open_file_dialog():
+                        # path can be file or directory
+                        file_path, _ = QFileDialog.getOpenFileName(
+                            self, "Select File", str(Path.home()), "All Files (*)")
+                        if file_path:
+                            txt.setText(file_path)
+                    button = QPushButton("Browse")
+                    button.clicked.connect(open_file_dialog)
+                    w = QWidget()
+                    w_layout = QHBoxLayout(w)
+                    w_layout.addWidget(txt)
+                    w_layout.addWidget(button)
+                    w.setLayout(w_layout)
                 elif kind == int:
                     w = QLineEdit()
                     w.setValidator(QIntValidator())
@@ -147,6 +170,10 @@ class ActionWidget(QWidget):
                 values[label] = kind(widget.text())
             elif isinstance(widget, QCheckBox):
                 values[label] = widget.isChecked()
+            elif isinstance(widget, QWidget) and isinstance(widget.layout(), QHBoxLayout) and widget.layout().count() == 2 and isinstance(widget.layout().itemAt(0).widget(), QLineEdit):
+                # handle file dialog input
+                line_edit = widget.layout().itemAt(0).widget()
+                values[label] = kind(line_edit.text()) if line_edit.text() else None
             else:
                 raise ValueError(f"Unsupported widget type: {type(widget)}")
         return values

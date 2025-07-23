@@ -22,6 +22,10 @@ class Commands:
     def test(self):
         return "This is test" 
     
+    def show_list(self):
+        return ["item1", "item2", "item3"]
+    def show_table(self):
+        return [{"col1": "value1", "col2": "value2"}, {"col1": "value3", "col2": "value4"}]
     @http_get
     def test_path(self, path: Path, *, full_path: bool=False):
         if full_path:
